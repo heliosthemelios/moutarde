@@ -1,0 +1,87 @@
+
+* {
+margin: 0;
+padding: 0;
+box-sizing: border-box;
+}
+
+body {
+font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+background: #f5f2eb;
+color: #333;
+line-height: 1.6;
+}
+
+header {
+background: #222;
+color: #f5f2eb;
+padding: 2rem 1rem;
+text-align: center;
+font-weight: 700;
+font-size: 2.5rem;
+letter-spacing: 2px;
+font-family: 'Georgia', serif;
+}
+
+main {
+max-width: 1000px;
+margin: 2rem auto;
+padding: 0 1rem;
+}
+
+.bio {
+font-style: italic;
+text-align: center;
+margin-bottom: 3rem;
+font-size: 1.2rem;
+color: #666;
+}
+
+.gallery {
+display: grid;
+grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+gap: 1.5rem;
+}
+
+.artwork {
+background: #fff;
+border-radius: 8px;
+overflow: hidden;
+box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+transition: transform 0.3s ease;
+cursor: pointer;
+}
+
+.artwork:hover {
+transform: scale(1.05);
+}
+
+.artwork img {
+width: 100%;
+display: block;
+height: 200px;
+object-fit: cover;
+}
+
+.artwork .title {
+padding: 1rem;
+font-weight: 600;
+font-size: 1.1rem;
+color: #222;
+}
+
+footer {
+text-align: center;
+padding: 2rem 1rem;
+font-size: 0.9rem;
+color: #999;
+border-top: 1px solid #ddd;
+margin-top: 4rem;
+}
+
+/* Responsive */
+@media (max-width: 500px) {
+header {
+    font-size: 1.8rem;
+}
+}
