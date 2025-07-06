@@ -5,7 +5,6 @@ from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.backends import default_backend
-import mysql.connector
 import getpass
 
 
@@ -15,40 +14,6 @@ moutarde = text2art("MOUTARDE")
 print(moutarde)
 
 CHUNK_SIZE = 64 * 1024  # 64 Ko
-
-def generer_mot_aleatoire():
-    return ''.join(random.choices(string.ascii_lowercase, k=8))
-
-
-def generer_mot_de_passe(longueur=12):
-    caracteres = string.ascii_letters + string.digits
-    return ''.join(random.choices(caracteres, k=longueur))
-
-
-def enregistrer_mot_de_passe(username, mot_de_passe):
-    try:
-        db_password = getpass.getpass("Entrez le mot de passe MySQL : ")
-        connexion = mysql.connector.connect(
-            host="82.197.82.30",
-            user="u189666068_helios",
-            password=db_password,
-            database="u189666068_passe"
-        )
-        curseur = connexion.cursor()
-        curseur.execute(
-            "INSERT INTO utilisateurs (username, mot_de_passe) VALUES (%s, %s)",
-            (username, mot_de_passe)
-        )
-        connexion.commit()
-        print("Mot de passe sécurisé enregistré.")
-    except Exception as err:
-        print("Erreur MySQL:", err)
-    finally:
-        if 'curseur' in locals():
-            curseur.close()
-        if 'connexion' in locals():
-            connexion.close()
-
 
 def derive_key(password: bytes, salt: bytes) -> bytes:
     kdf = PBKDF2HMAC(
@@ -138,10 +103,7 @@ def main():
     choix = input("pour crypter (0) : pour decrypter (1) : ")
 
     if choix == "0":
-        nom = generer_mot_aleatoire()
-        mdp = generer_mot_de_passe()
-        enregistrer_mot_de_passe(nom, mdp)
-        print(f"{mdp} est le mot de passe utilisé pour le chiffrement.")
+        mdp = input("Entrez un mot de passe, gardez en securite")
         dossier = input("Entre l'adresse complète du dossier à crypter : ")
         if not os.path.isdir(dossier):
             print("Dossier invalide.")
