@@ -1,166 +1,126 @@
-import os
-import string
-import random
+import tkinter as tk
+from tkinter import filedialog, messagebox
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
-from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
-from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.backends import default_backend
-import mysql.connector
-import getpass
+from cryptography.hazmat.primitives import hashes
+from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
+import os
 
-
-from art import *
-
-moutarde = text2art("MOUTARDE")
-print(moutarde)
-
-CHUNK_SIZE = 64 * 1024  # 64 Ko
-
-def generer_mot_aleatoire():
-    return ''.join(random.choices(string.ascii_lowercase, k=8))
-
-
-def generer_mot_de_passe(longueur=12):
-    caracteres = string.ascii_letters + string.digits
-    return ''.join(random.choices(caracteres, k=longueur))
-
-
-def enregistrer_mot_de_passe(username, mot_de_passe):
-    try:
-        db_password = getpass.getpass("Entrez le mot de passe MySQL : ")
-        connexion = mysql.connector.connect(
-            host="82.197.82.30",
-            user="u189666068_helios",
-            password=db_password,
-            database="u189666068_passe"
-        )
-        curseur = connexion.cursor()
-        curseur.execute(
-            "INSERT INTO utilisateurs (username, mot_de_passe) VALUES (%s, %s)",
-            (username, mot_de_passe)
-        )
-        connexion.commit()
-        print("Mot de passe sécurisé enregistré.")
-    except Exception as err:
-        print("Erreur MySQL:", err)
-    finally:
-        if 'curseur' in locals():
-            curseur.close()
-        if 'connexion' in locals():
-            connexion.close()
-
-
-def derive_key(password: bytes, salt: bytes) -> bytes:
+def generate_key(password: str, salt: bytes) -> bytes:
     kdf = PBKDF2HMAC(
         algorithm=hashes.SHA256(),
         length=32,
         salt=salt,
-        iterations=100_000,
+        iterations=100000,
         backend=default_backend()
     )
-    return kdf.derive(password)
+    return kdf.derive(password.encode('utf-8'))
 
-
-def encrypt_file(input_path, output_path, password):
+def encrypt_file(filepath: str, password: str):
     salt = os.urandom(16)
-    nonce = os.urandom(12)
-    key = derive_key(password.encode(), salt)
-    encryptor = Cipher(
-        algorithms.AES(key),
-        modes.GCM(nonce),
-        backend=default_backend()
-    ).encryptor()
+    key = generate_key(password, salt)
+    iv = os.urandom(12)
 
-    with open(input_path, 'rb') as f_in, open(output_path, 'wb') as f_out:
+    cipher = Cipher(algorithms.AES(key), modes.GCM(iv), backend=default_backend())
+    encryptor = cipher.encryptor()
+
+    with open(filepath, 'rb') as f_in:
+        plaintext = f_in.read()
+
+    ciphertext = encryptor.update(plaintext) + encryptor.finalize()
+    tag = encryptor.tag
+
+    encrypted_filepath = filepath + ".enc"
+    with open(encrypted_filepath, 'wb') as f_out:
         f_out.write(salt)
-        f_out.write(nonce)
-        while chunk := f_in.read(CHUNK_SIZE):
-            f_out.write(encryptor.update(chunk))
-        f_out.write(encryptor.finalize())
-        f_out.write(encryptor.tag)
+        f_out.write(iv)
+        f_out.write(tag)
+        f_out.write(ciphertext)
 
+    return encrypted_filepath
 
-def encrypt_folder(folder_path, password, keep_original=False):
-    for root, _, files in os.walk(folder_path):
-        for file_name in files:
-            file_path = os.path.join(root, file_name)
-            if file_path.endswith(".enc"):
-                continue
-            encrypted_path = file_path + ".enc"
-            print(f"Chiffrement de : {file_path}")
-            encrypt_file(file_path, encrypted_path, password)
-            if not keep_original:
-                os.remove(file_path)
+def decrypt_file(filepath: str, password: str):
+    try:
+        with open(filepath, 'rb') as f_in:
+            salt = f_in.read(16)
+            iv = f_in.read(12)
+            tag = f_in.read(16)
+            ciphertext = f_in.read()
 
+        key = generate_key(password, salt)
+        cipher = Cipher(algorithms.AES(key), modes.GCM(iv, tag), backend=default_backend())
+        decryptor = cipher.decryptor()
 
-def decrypt_file(input_path, output_path, password):
-    with open(input_path, 'rb') as f_in:
-        salt = f_in.read(16)
-        nonce = f_in.read(12)
-        file_size = os.path.getsize(input_path)
+        plaintext = decryptor.update(ciphertext) + decryptor.finalize()
+        decrypted_filepath = filepath.replace(".enc", ".decrypted")
 
-        f_in.seek(file_size - 16)
-        tag = f_in.read(16)
+        with open(decrypted_filepath, 'wb') as f_out:
+            f_out.write(plaintext)
 
-        key = derive_key(password.encode(), salt)
+        return decrypted_filepath
 
-        decryptor = Cipher(
-            algorithms.AES(key),
-            modes.GCM(nonce, tag),
-            backend=default_backend()
-        ).decryptor()
+    except Exception as e:
+        raise ValueError("Erreur lors du déchiffrement : mot de passe incorrect ou fichier corrompu.")
 
-        f_in.seek(28)
-        to_read = file_size - 28 - 16
-        with open(output_path, 'wb') as f_out:
-            total = 0
-            while total < to_read:
-                chunk = f_in.read(min(CHUNK_SIZE, to_read - total))
-                f_out.write(decryptor.update(chunk))
-                total += len(chunk)
-            f_out.write(decryptor.finalize())
+# Interface graphique
+class CryptoApp:
+    def __init__(self, master):
+        self.master = master
+        master.title("Chiffrement de fichiers")
+        master.geometry("400x250")
 
+        self.label = tk.Label(master, text="Choisissez un fichier à chiffrer/déchiffrer :")
+        self.label.pack(pady=10)
 
-def decrypt_folder(folder_path, password, keep_encrypted=False):
-    for root, _, files in os.walk(folder_path):
-        for file_name in files:
-            if not file_name.endswith(".enc"):
-                continue
-            file_path = os.path.join(root, file_name)
-            decrypted_path = os.path.join(root, file_name[:-4])
-            print(f"Déchiffrement de : {file_path}")
-            decrypt_file(file_path, decrypted_path, password)
-            if not keep_encrypted:
-                os.remove(file_path)
+        self.file_path = tk.StringVar()
+        self.file_entry = tk.Entry(master, textvariable=self.file_path, width=50)
+        self.file_entry.pack()
 
+        self.browse_button = tk.Button(master, text="Parcourir", command=self.browse_file)
+        self.browse_button.pack(pady=5)
 
-def main():
-    choix = input("pour crypter (0) : pour decrypter (1) : ")
+        self.password_label = tk.Label(master, text="Mot de passe :")
+        self.password_label.pack()
 
-    if choix == "0":
-        nom = generer_mot_aleatoire()
-        mdp = generer_mot_de_passe()
-        enregistrer_mot_de_passe(nom, mdp)
-        print(f"{mdp} est le mot de passe utilisé pour le chiffrement.")
-        dossier = input("Entre l'adresse complète du dossier à crypter : ")
-        if not os.path.isdir(dossier):
-            print("Dossier invalide.")
+        self.password_entry = tk.Entry(master, show="*")
+        self.password_entry.pack(pady=5)
+
+        self.encrypt_button = tk.Button(master, text="Chiffrer", command=self.encrypt)
+        self.encrypt_button.pack(pady=5)
+
+        self.decrypt_button = tk.Button(master, text="Déchiffrer", command=self.decrypt)
+        self.decrypt_button.pack(pady=5)
+
+    def browse_file(self):
+        filepath = filedialog.askopenfilename()
+        if filepath:
+            self.file_path.set(filepath)
+
+    def encrypt(self):
+        path = self.file_path.get()
+        password = self.password_entry.get()
+        if not path or not password:
+            messagebox.showwarning("Erreur", "Veuillez sélectionner un fichier et entrer un mot de passe.")
             return
-        encrypt_folder(dossier, mdp)
-        print("Chiffrement terminé.")
+        try:
+            encrypted_path = encrypt_file(path, password)
+            messagebox.showinfo("Succès", f"Fichier chiffré : {encrypted_path}")
+        except Exception as e:
+            messagebox.showerror("Erreur", f"Erreur lors du chiffrement : {e}")
 
-    elif choix == "1":
-        dossier = input("Entre l'adresse complète du dossier à décrypter : ")
-        if not os.path.isdir(dossier):
-            print("Dossier invalide.")
+    def decrypt(self):
+        path = self.file_path.get()
+        password = self.password_entry.get()
+        if not path or not password:
+            messagebox.showwarning("Erreur", "Veuillez sélectionner un fichier et entrer un mot de passe.")
             return
-        motdepasse = input("Entrez le mot de passe de déchiffrement : ")
-        decrypt_folder(dossier, motdepasse)
-        print("Déchiffrement terminé.")
-    else:
-        print("Choix invalide.")
-
+        try:
+            decrypted_path = decrypt_file(path, password)
+            messagebox.showinfo("Succès", f"Fichier déchiffré : {decrypted_path}")
+        except Exception as e:
+            messagebox.showerror("Erreur", str(e))
 
 if __name__ == "__main__":
-    main()
-
+    root = tk.Tk()
+    app = CryptoApp(root)
+    root.mainloop()
