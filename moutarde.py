@@ -1,4 +1,6 @@
 import os
+import tkinter as tk
+from tkinter import filedialog, messagebox
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 from cryptography.hazmat.primitives import hashes
@@ -126,38 +128,66 @@ def decrypt_folder(folder_path, password, keep_encrypted=False):
             if succes and not keep_encrypted:
                 os.remove(file_path)
 
+def choisir_dossier():
+    # Ouvre une vraie fenêtre Windows pour choisir un dossier
+    dossier = filedialog.askdirectory()
+    if dossier:
+        champ_dossier.delete(0, tk.END)
+        champ_dossier.insert(0, dossier)
 
-def main():
-    choix = input("pour crypter (0) : pour decrypter (1) : ")
-
-    if choix == "0":
-        # Saisie sécurisée sans afficher le mot de passe à l'écran
-        mdp = getpass.getpass("Entrez un mot de passe (gardez-le en sécurité) : ")
-        mdp_conf = getpass.getpass("Confirmez le mot de passe : ")
+def lancer_chiffrement():
+    dossier = champ_dossier.get()
+    mdp = champ_mdp.get()
+    
+    if not dossier or not mdp:
+        messagebox.showerror("Erreur", "Veuillez choisir un dossier et un mot de passe.")
+        return
         
-        if mdp != mdp_conf:
-            print("Les mots de passe ne correspondent pas. Annulation.")
-            return
-            
-        dossier = input("Entre l'adresse complète du dossier à crypter : ")
-        if not os.path.isdir(dossier):
-            print("Dossier invalide.")
-            return
-        encrypt_folder(dossier, mdp)
-        print("Chiffrement terminé.")
+    encrypt_folder(dossier, mdp)
+    messagebox.showinfo("Succès", "Le dossier a été chiffré avec succès !")
 
-    elif choix == "1":
-        dossier = input("Entre l'adresse complète du dossier à décrypter : ")
-        if not os.path.isdir(dossier):
-            print("Dossier invalide.")
-            return
-        motdepasse = getpass.getpass("Entrez le mot de passe de déchiffrement : ")
-        decrypt_folder(dossier, motdepasse)
-        print("Déchiffrement terminé.")
-    else:
-        print("Choix invalide.")
+def lancer_dechiffrement():
+    dossier = champ_dossier.get()
+    mdp = champ_mdp.get()
+    
+    if not dossier or not mdp:
+        messagebox.showerror("Erreur", "Veuillez choisir un dossier et un mot de passe.")
+        return
+        
+    decrypt_folder(dossier, mdp)
+    messagebox.showinfo("Succès", "Le dossier a été déchiffré avec succès !")
 
+# ==========================================
+# CRÉATION DE L'INTERFACE GRAPHIQUE TKINTER
+# ==========================================
 
+# 1. Création de la fenêtre principale
+fenetre = tk.Tk()
+fenetre.title("Moutarde - Chiffrement PDF")
+fenetre.geometry("450x250")
+
+# 2. Section pour choisir le dossier
+tk.Label(fenetre, text="Dossier cible :").pack(pady=(10, 0))
+champ_dossier = tk.Entry(fenetre, width=50)
+champ_dossier.pack(pady=5)
+bouton_parcourir = tk.Button(fenetre, text="Parcourir...", command=choisir_dossier)
+bouton_parcourir.pack()
+
+# 3. Section pour le mot de passe
+tk.Label(fenetre, text="Mot de passe :").pack(pady=(10, 0))
+champ_mdp = tk.Entry(fenetre, width=30, show="*") # show="*" masque les caractères
+champ_mdp.pack(pady=5)
+
+# 4. Boutons d'action
+frame_boutons = tk.Frame(fenetre)
+frame_boutons.pack(pady=20)
+
+bouton_crypter = tk.Button(frame_boutons, text="🔒 Crypter le dossier", bg="lightcoral", command=lancer_chiffrement)
+bouton_crypter.pack(side=tk.LEFT, padx=10)
+
+bouton_decrypter = tk.Button(frame_boutons, text="🔓 Décrypter le dossier", bg="lightgreen", command=lancer_dechiffrement)
+bouton_decrypter.pack(side=tk.LEFT, padx=10)
+
+# Lancement de la boucle de l'interface
 if __name__ == "__main__":
-    main()
-
+    fenetre.mainloop()
